@@ -234,6 +234,12 @@ docker compose down
 
 ---
 
+## Analysis
+
+`eda_runs.ipynb` contains the full exploratory analysis of the generated dataset. It produces all figures and tables reported in the paper: profile distributions (gender, employment, language, dependents), budget distributions, evaluator score statistics, issue frequency, score breakdown by employment status and budget position, and Pearson correlations between profile variables and rubric scores.
+
+---
+
 ## Output Format
 
 Each line of `runs/runs.jsonl` is a JSON object:
