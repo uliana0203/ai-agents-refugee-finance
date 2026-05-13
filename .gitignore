@@ -1,0 +1,24 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+# RAG indexes (large binary files, reproducible from books)
+indexes/
+
+# EDA (local research only, not for version control)
+eda_runs.ipynb
+eda_figures/
+
+# Generated datasets (large, not for version control)
+runs/*.jsonl
+
+# Misc
+finance/
+test_functions/
+books_consultant/live_web_cache/
+books_refuge/2.0.Патерни фінансової поведінки українців у Польщі (Ответы).xlsx

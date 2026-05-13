@@ -1,0 +1,19 @@
+services:
+
+  # ---------------------------------------------------------------
+  # pipeline — generates synthetic refugee pension-advice cases
+  # Usage:
+  #   docker compose run --rm pipeline
+  #   N_CASES=50 docker compose run --rm pipeline
+  # ---------------------------------------------------------------
+  pipeline:
+    build: .
+    image: refugee-finance-pipeline:latest
+    env_file: .env
+    environment:
+      N_CASES: ${N_CASES:-5}
+    volumes:
+      - ./indexes:/app/indexes
+      - ./runs:/app/runs
+      - ./books_refuge:/app/books_refuge
+      - ./books_consultant:/app/books_consultant

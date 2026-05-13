@@ -1,0 +1,18 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+indexes/
+finance/
+test_functions/
+eda_runs.ipynb
+eda_figures/
+books_consultant/live_web_cache/
+books_refuge/2.0.Патерни фінансової поведінки українців у Польщі (Ответы).xlsx
+*.jsonl
+.git/
+.gitignore

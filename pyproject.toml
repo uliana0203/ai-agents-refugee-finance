@@ -1,0 +1,39 @@
+[tool.poetry]
+name = "ai-agents-refugee-finance"
+version = "0.1.0"
+description = "AI agents for personal finance advice for Ukrainian refugees in Poland"
+authors = []
+readme = "README.md"
+packages = [{ include = "src" }, { include = "agents" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+langchain-openai = "^0.3"
+langchain-community = "^0.3"
+langchain-core = "^0.3"
+langchain-text-splitters = "^0.3"
+langchain-experimental = "^0.3"
+langgraph = "^0.2"
+
+faiss-cpu = "^1.8"
+openai = "^1.0"
+
+openpyxl = "^3.1"
+beautifulsoup4 = "^4.12"
+lxml = "^5.0"
+pypdf = "^4.0"
+mcp = "^1.0"
+mcp-server-fetch = ">=0.1"
+tavily-python = "^0.5"
+
+python-dotenv = "^1.0"
+tqdm = "^4.66"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+pytest-asyncio = "^0.23"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry-core.masonry.api"

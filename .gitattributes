@@ -1,0 +1,9 @@
+* text=auto eol=lf
+*.py text eol=lf
+*.toml text eol=lf
+*.md text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+Dockerfile text eol=lf
+.env* text eol=lf
