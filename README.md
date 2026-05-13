@@ -1,4 +1,4 @@
-# AI Agents -- Pension Advice for Ukrainian Refugees in Poland
+# AI Agents - Pension Advice for Ukrainian Refugees in Poland
 
 A multi-agent pipeline that generates synthetic financial profiles of Ukrainian refugees in Poland and produces retirement savings advice grounded in Polish pension law.
 
@@ -19,13 +19,13 @@ Each iteration is orchestrated by **LangGraph** and the result is appended to `r
 
 ### Agents
 
-**RefugeeAgent** -- `agents/refugee.py`
+**RefugeeAgent** - `agents/refugee.py`
 Generates a synthetic refugee profile. Demographic anchors (gender, employment, income band, language level, months in Poland) are drawn from NBP 2025 statistical distributions. Budget figures are computed algorithmically in PLN with hard expense floors. An LLM generates qualitative persona details (age, education, retirement goals). Clarifying answers follow a rule-based path for common questions; an LLM fallback handles the rest.
 
-**ConsultantAgent** -- `agents/consultant.py`
+**ConsultantAgent** - `agents/consultant.py`
 Two-pass RAG advisor. `draft()` retrieves sources and proposes up to 3 clarifying questions. `final()` uses the Q&A together with a fresh retrieval pass to write a structured recommendation. The final answer is enforced via a Pydantic schema (`_FinalAnswerStruct`) using function calling; a JSON-mode LLM is used as fallback. If required sections are still missing after generation, `_ensure_required_final_sections()` fills them deterministically and records each repair in `repair_issues`. Sources come from three channels: a local FAISS vectorstore (PDF/HTML/XLSX documents), live web pages (gov.pl, zus.pl, euraxess.pl, fetched via MCP), and optional Tavily search. Web sources are numbered from S100, Tavily sources from S200. Private pension vehicles (PPK/IKE/IKZE/OFE) are automatically stripped unless they appear in the retrieved sources.
 
-**EvaluatorAgent** -- `agents/evaluator.py`
+**EvaluatorAgent** - `agents/evaluator.py`
 Two-stage quality check described in detail in the [Evaluation](#evaluation) section.
 
 ---
@@ -53,7 +53,7 @@ Two-stage quality check described in detail in the [Evaluation](#evaluation) sec
 
 Answer quality is assessed in two sequential stages. The result of both stages is stored under the `evaluator` key of each run record.
 
-### Stage 1 -- Deterministic checks
+### Stage 1 - Deterministic checks
 
 These checks run without an LLM call and produce hard flags:
 
@@ -64,7 +64,7 @@ These checks run without an LLM call and produce hard flags:
 | **Private-program hallucination** | Checks whether PPK / IKE / IKZE appear in the answer but not in the retrieved sources | -> `unsupported_claim` issue (severity: high) |
 | **Unknown citations** | Detects citation IDs not present in `final_sources` | -> `unsupported_claim` issue (severity: high) |
 
-### Stage 2 -- LLM rubric (DeepSeek)
+### Stage 2 - LLM rubric (DeepSeek)
 
 Five dimensions are scored 0-10. Each score must be backed by a direct quote from the answer text.
 
@@ -76,7 +76,7 @@ Five dimensions are scored 0-10. Each score must be backed by a direct quote fro
 | **Clarity** | Is the answer accessible to a person with basic financial literacy? | -2 per unexplained jargon |
 | **Safety / ethics** | Are legal entitlements stated with appropriate caveats? | -3 if specific pension amounts are presented as guaranteed facts |
 
-**Exemptions** -- the following are never penalised as unsupported claims:
+**Exemptions** - the following are never penalised as unsupported claims:
 - Rodzina 800+ benefit (PLN 800/child/month) when `dependents > 0`
 - MOPS/GOPS social assistance when profile shows unemployment + low income
 - ZUS contribution gap when profile shows unemployed/economically_inactive
@@ -142,8 +142,8 @@ poetry install
 ### 4. Add source documents
 
 Place files in:
-- `books_refuge/` -- NBP reports, surveys, `.xlsx` tables about Ukrainian refugees in Poland
-- `books_consultant/` -- Polish pension law, ZUS guides, MISSOC documents
+- `books_refuge/` - NBP reports, surveys, `.xlsx` tables about Ukrainian refugees in Poland
+- `books_consultant/` - Polish pension law, ZUS guides, MISSOC documents
 
 Supported formats: `.pdf`, `.html`, `.xlsx`
 
