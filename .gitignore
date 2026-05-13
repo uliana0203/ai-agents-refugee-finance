@@ -10,8 +10,7 @@ __pycache__/
 # RAG indexes (large binary files, reproducible from books)
 indexes/
 
-# EDA (local research only, not for version control)
-eda_runs.ipynb
+# EDA figures (generated, not for version control)
 eda_figures/
 
 # Generated datasets (large, not for version control)
