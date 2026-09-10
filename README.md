@@ -1,8 +1,8 @@
-# AI Agents - Pension Advice for Ukrainian Refugees in Poland
+# AI Agents for Retirement-Oriented Financial Guidance for Displaced Ukrainians in Poland
 
-A multi-agent pipeline that generates synthetic financial profiles of Ukrainian refugees in Poland and produces retirement savings advice grounded in Polish pension law.
+A multi-agent research pipeline for generating synthetic financial profiles modelled on displaced Ukrainians in Poland and producing retirement-oriented financial guidance grounded in Polish institutional sources.
 
-Based on **NBP 2025 survey data** (n = 3,965 respondents, April-June 2025).
+The synthetic profile generator is informed primarily by the **2025 survey of Ukrainian migrants in Poland conducted by Narodowy Bank Polski and published in 2026**. The survey sample used as the principal calibration anchor contains **3,965 respondents**. Not all profile variables are survey-derived. Several variables and conditional sampling rules are researcher-defined modelling assumptions, as described below.
 
 Dataset: [Uliana333/ukrainian-refugees-financial-advisory](https://huggingface.co/datasets/Uliana333/ukrainian-refugees-financial-advisory)
 
@@ -10,23 +10,87 @@ Dataset: [Uliana333/ukrainian-refugees-financial-advisory](https://huggingface.c
 
 ## Architecture
 
-```
+```text
 RefugeeAgent  ->  ConsultantAgent (draft)  ->  RefugeeAgent (clarify)  ->  ConsultantAgent (final)  ->  EvaluatorAgent
-   (profile)          (draft + Qs)                 (answers)                 (grounded advice)         (quality score)
+   (profile)          (draft + Qs)                 (answers)                 (grounded advice)         (quality control)
 ```
 
-Each iteration is orchestrated by **LangGraph** and the result is appended to `runs/runs.jsonl`.
+Each advisory cycle is orchestrated with **LangGraph**. The main pipeline stores run records in `runs/runs.jsonl`.
 
-### Agents
+The architecture separates three functions:
 
-**RefugeeAgent** - `agents/refugee.py`
-Generates a synthetic refugee profile. Demographic anchors (gender, employment, income band, language level, months in Poland) are drawn from NBP 2025 statistical distributions. Budget figures are computed algorithmically in PLN with hard expense floors. An LLM generates qualitative persona details (age, education, retirement goals). Clarifying answers follow a rule-based path for common questions; an LLM fallback handles the rest.
+1. synthetic case construction
+2. retrieval-grounded recommendation generation
+3. post-generation evaluation and routing
 
-**ConsultantAgent** - `agents/consultant.py`
-Two-pass RAG advisor. `draft()` retrieves sources and proposes up to 3 clarifying questions. `final()` uses the Q&A together with a fresh retrieval pass to write a structured recommendation. The final answer is enforced via a Pydantic schema (`_FinalAnswerStruct`) using function calling; a JSON-mode LLM is used as fallback. If required sections are still missing after generation, `_ensure_required_final_sections()` fills them deterministically and records each repair in `repair_issues`. Sources come from three channels: a local FAISS vectorstore (PDF/HTML/XLSX documents), live web pages (gov.pl, zus.pl, euraxess.pl, fetched via MCP), and optional Tavily search. Web sources are numbered from S100, Tavily sources from S200. Private pension vehicles (PPK/IKE/IKZE/OFE) are automatically stripped unless they appear in the retrieved sources.
+The three-agent design is a functional decomposition used for traceability and controllability. It is not presented as an experimentally established optimal architecture.
 
-**EvaluatorAgent** - `agents/evaluator.py`
-Two-stage quality check described in detail in the [Evaluation](#evaluation) section.
+---
+
+## Agents
+
+### RefugeeAgent
+
+File: `agents/refugee.py`
+
+The RefugeeAgent generates a structured synthetic client case.
+
+Quantitative financial variables are generated algorithmically from sampled anchors and predefined budget rules. The LLM is used only for qualitative persona attributes, contextual constraints, retirement-oriented questions, and fallback clarification answers.
+
+The agent uses:
+
+- survey-derived demographic and labour-market anchors
+- survey-anchored income bands combined with researcher-defined within-band sampling
+- researcher-defined rules for dependents, duration of residence, savings, expenditure shares, and conditional Polish-language proficiency
+- deterministic budget generation in PLN
+- top-k retrieval from the refugee-context knowledge base for qualitative constraints only
+- rule-based clarification templates with an LLM fallback
+
+The RefugeeAgent does not generate financial advice.
+
+### ConsultantAgent
+
+File: `agents/consultant.py`
+
+The ConsultantAgent is a two-stage retrieval-augmented advisory component.
+
+`draft()` retrieves evidence and generates a preliminary response together with up to three clarifying questions.
+
+`final()` incorporates the clarification answers, performs a fresh retrieval pass, and produces a structured recommendation.
+
+The final response follows a fixed schema with:
+
+- summary
+- quick budget check
+- suggested monthly retirement-saving amount
+- retirement-related options in Poland
+- next steps
+- sources used
+
+The ConsultantAgent combines three evidence channels:
+
+- local FAISS vector retrieval
+- curated live retrieval from trusted institutional domains
+- optional Tavily search restricted to the same domain allow-list
+
+Retrieved source objects use explicit identifiers so that cited evidence can be checked downstream.
+
+The ConsultantAgent also applies deterministic safeguards before the recommendation is passed to the EvaluatorAgent. Budget values in the final quick-budget block are overwritten with values recomputed from the structured profile. Unsupported mentions of private pension vehicles such as PPK, IKE, IKZE, and OFE are removed when those terms are not supported by the retrieved evidence.
+
+### EvaluatorAgent
+
+File: `agents/evaluator.py`
+
+The EvaluatorAgent is architecturally separate from the ConsultantAgent. It does not perform additional retrieval.
+
+It receives:
+
+- the final recommendation
+- the structured client profile
+- the source objects retrieved during the ConsultantAgent stage
+- repair metadata produced during structured-output validation
+
+Evaluation combines deterministic checks with an LLM-based rubric. The resulting scores are **model-based evaluation outcomes**. They have not been validated against financial professionals or target users.
 
 ---
 
@@ -34,84 +98,236 @@ Two-stage quality check described in detail in the [Evaluation](#evaluation) sec
 
 | Agent | Model | Purpose |
 |---|---|---|
-| RefugeeAgent | `gpt-4o-mini` | Persona, constraints, clarifying answers |
-| ConsultantAgent | `gpt-4.1-mini` | Draft, clarifying questions, final structured advice |
-| EvaluatorAgent | `deepseek-chat` | Rubric scoring (temperature 0.1) |
+| RefugeeAgent | `gpt-4o-mini` | Persona generation, qualitative constraints, user questions, clarification answers |
+| ConsultantAgent | `gpt-4.1-mini` | Draft generation, clarifying questions, final structured guidance |
+| EvaluatorAgent | `deepseek-chat` | Rubric-based post-generation assessment |
 
-**Approximate cost per 1,000 cases:**
+Default ConsultantAgent and EvaluatorAgent temperature is `0.1`.
 
-| Model | ~Input tokens | ~Output tokens | Cost per 1k cases |
-|---|---|---|---|
-| gpt-4o-mini | 1,200 | 400 | ~$0.30 |
-| gpt-4.1-mini | 3,500 | 900 | ~$2.20 |
-| deepseek-chat | 4,000 | 600 | ~$0.70 |
-| **Total** | | | **~$3.20** |
+The RefugeeAgent uses task-specific temperatures defined in `agents/refugee.py`.
+
+---
+
+## Retrieval configuration
+
+The local retrieval layer uses:
+
+| Parameter | Configuration |
+|---|---|
+| Embedding model | `text-embedding-3-small` |
+| Vector store | Local FAISS |
+| Similarity configuration | FAISS default L2 / Euclidean distance |
+| Semantic chunking | Percentile breakpoint threshold = 95 |
+| Post-semantic size guard | Maximum chunk size = 1,500 characters |
+| Chunk overlap | 100 characters |
+| Consultant retrieval | top-k = 5 |
+| Refugee-context retrieval | top-k = 4 |
+| Reranking | Not implemented |
+| Retrieval-score threshold | Not implemented |
+
+The size guard uses `RecursiveCharacterTextSplitter` after semantic chunking.
+
+The ConsultantAgent can also use curated live institutional retrieval. By default, up to four live sources can be fetched per query. The configured domain allow-list includes:
+
+- `gov.pl`
+- `zus.pl`
+- `podatki.gov.pl`
+- `biznes.gov.pl`
+- `euraxess.pl`
+- `ec.europa.eu`
+
+Tavily is disabled by default and is used only when explicitly enabled. When enabled, it is restricted to the same domain allow-list.
+
+No explicit reranking, retrieval-score thresholding, source-deduplication, or contradiction-reconciliation stage is implemented.
 
 ---
 
 ## Evaluation
 
-Answer quality is assessed in two sequential stages. The result of both stages is stored under the `evaluator` key of each run record.
+Evaluation is performed in two stages.
 
-### Stage 1 - Deterministic checks
+### Stage 1: deterministic checks
 
-These checks run without an LLM call and produce hard flags:
+The deterministic layer checks:
 
-| Check | What it detects | Effect on final verdict |
-|---|---|---|
-| **Arithmetic consistency** | Compares income, expenses, surplus stated in the answer against `profile_json` ground truth (tolerance +-PLN 30) | Mismatch -> `math_error` issue (severity: high) |
-| **Citation presence** | Counts `[S#]` / `[W#]` tags; flags if Poland-specific regulatory claims appear without any citation | -> `missing_citation` issue (severity: medium) |
-| **Private-program hallucination** | Checks whether PPK / IKE / IKZE appear in the answer but not in the retrieved sources | -> `unsupported_claim` issue (severity: high) |
-| **Unknown citations** | Detects citation IDs not present in `final_sources` | -> `unsupported_claim` issue (severity: high) |
+| Check | Purpose |
+|---|---|
+| Arithmetic consistency | Compare reported budget values with values recomputed from `profile_json` |
+| Citation presence | Detect missing citation support for Poland-specific claims |
+| Citation validity | Detect citation identifiers that do not correspond to supplied source objects |
+| Source trust | Detect live or open-web sources outside the configured allow-list |
+| Structural completeness | Detect missing required sections |
+| Private-program support | Detect unsupported mentions of configured private pension products |
 
-### Stage 2 - LLM rubric (DeepSeek)
+Arithmetic consistency uses a tolerance of `± PLN 30`.
 
-Five dimensions are scored 0-10. Each score must be backed by a direct quote from the answer text.
+### Stage 2: LLM rubric
 
-| Dimension | What is evaluated | Deductions |
-|---|---|---|
-| **Groundedness** | Are Poland-specific claims (ZUS, pension age, benefit amounts) supported by `[S#]` citations? | -2 per unsupported factual claim |
-| **Arithmetic consistency** | Does the answer correctly restate income, expenses and surplus from the profile? | -4 if wrong numbers; -2 if omitted |
-| **Actionability** | Are concrete next steps given that match this specific profile? For deficit profiles: quality of benefit referrals (Rodzina 800+, MOPS), not saving amount. | Assessed contextually |
-| **Clarity** | Is the answer accessible to a person with basic financial literacy? | -2 per unexplained jargon |
-| **Safety / ethics** | Are legal entitlements stated with appropriate caveats? | -3 if specific pension amounts are presented as guaranteed facts |
+The EvaluatorAgent assigns model-based scores from 0 to 10 for:
 
-**Exemptions** - the following are never penalised as unsupported claims:
-- Rodzina 800+ benefit (PLN 800/child/month) when `dependents > 0`
-- MOPS/GOPS social assistance when profile shows unemployment + low income
-- ZUS contribution gap when profile shows unemployed/economically_inactive
-- Any statement explicitly labelled "(general rule of thumb, not Poland-specific)"
+| Dimension | Interpretation |
+|---|---|
+| Groundedness | Support for factual and Poland-specific claims |
+| Arithmetic consistency | Consistency of reported numerical information |
+| Actionability | Specificity and practical usefulness of next steps |
+| Clarity | Accessibility and comprehensibility |
+| Safety / ethics | Caution, appropriateness, and avoidance of overconfident guidance |
+
+The arithmetic score should be interpreted together with the deterministic budget safeguard. Near-perfect arithmetic consistency primarily reflects engineered recomputation and validation rather than unaided numerical reasoning by the ConsultantAgent.
 
 ### Score aggregation and penalties
 
+The base score is the rounded mean of the five rubric dimensions.
+
+```text
+base_score = round(mean(
+    groundedness,
+    arithmetic_consistency,
+    actionability,
+    clarity,
+    safety_ethics
+))
+
+final_score = clip(base_score - deterministic_penalties, 0, 10)
 ```
-base_score  = mean(groundedness, arithmetic, actionability, clarity, safety)
-final_score = base_score - penalties_from_stage_1
-```
 
-Penalty weights (configurable in `EvaluatorConfig`):
+Configured penalty weights are:
 
-| Issue type | Severity | Penalty |
-|---|---|---|
-| `math_error` | high | -4 |
-| `private_program_hallucination` | high | -4 |
-| `unsupported_claim` | high | -2 |
-| `unsupported_claim` | medium | -1 |
-| `missing_citation` | medium | -1 |
+| Trigger | Penalty |
+|---|---:|
+| High-severity arithmetic error | -4 |
+| Missing citation | -1 |
+| Missing required section | -2 |
+| Untrusted source | -1 |
+| Unsupported private-program mention | -4 |
+| High-severity unsupported claim | -2 |
+| Medium-severity unsupported claim | -1 |
 
-Final score is clamped to `[0, 10]`.
+Multiple applicable penalties are combined additively.
 
 ### Case routing
 
-Each case is routed to one of three outcomes and labelled in `case_status`:
+Each case is assigned one of three operational routing outcomes:
 
 | Label | Condition |
 |---|---|
-| `accepted` | `allow_to_show = True` AND `grounded_only_pass = True` AND `overall_score >= 9` |
-| `needs_review` | `allow_to_show = True` but score 7-8, or grounding check failed |
-| `flagged` | `allow_to_show = False` OR `overall_score < 7` |
+| `accepted` | `allow_to_show = True`, `grounded_only_pass = True`, and `overall_score >= 9` |
+| `needs_review` | All cases that are neither accepted nor flagged |
+| `flagged` | `allow_to_show = False` or `overall_score < 7` |
 
-`grounded_only_pass` is `False` if any `unsupported_claim` or `math_error` with severity `high` was detected.
+`allow_to_show` is a deterministic display gate. It becomes false when a high-severity issue prevents automatic display.
+
+`grounded_only_pass` is a separate grounding gate. It becomes false when configured high-severity unsupported or arithmetic issues are present or when medium-or-higher citation, structural, or source-trust issues are detected.
+
+An `accepted` case therefore means only that the case passed the predefined automated criteria. It does not mean professional approval or demonstrated real-world deployment safety.
+
+---
+
+## Experiments
+
+Additional robustness and ablation analyses are available in the `experiments/` directory.
+
+```text
+experiments/
+├── figures/
+├── outputs/
+│   ├── baseline_no_rag.jsonl
+│   ├── repeated_runs.jsonl
+│   ├── analysis_summary.json
+│   └── analysis_tables.xlsx
+├── analysis.py
+├── repeated_runs.py
+├── analysis.ipynb
+├── test_analysis.py
+└── README.md
+```
+
+The directory contains three main analysis components.
+
+### Scoring and routing audit
+
+`analysis.py` reconstructs composite scores and routing outcomes from stored evaluator outputs. It also summarizes issue severity, penalty application, subgroup comparisons, retrieval metadata, and threshold sensitivity.
+
+### Paired no-RAG ablation
+
+The no-RAG experiment uses fixed synthetic profiles and compares the same cases with RAG and without RAG.
+
+The profile, query, clarification sequence, model configuration, deterministic arithmetic safeguard, EvaluatorAgent, scoring logic, and routing thresholds are held fixed.
+
+In the condition without RAG:
+
+- retrieval is disabled
+- no external source objects are passed to the ConsultantAgent or EvaluatorAgent
+- citation requirements that cannot be satisfied without retrieval are removed from the output contract
+- the recommendation is generated using the model and supplied client profile only
+
+This experiment is designed to isolate the role of retrieval in the implemented pipeline. It does not provide a single-agent or no-evaluator comparison.
+
+### Repeated-run stability
+
+The repeated-run experiment selects fixed original profiles and replays the final ConsultantAgent and EvaluatorAgent stages multiple times.
+
+The fixed inputs are:
+
+- structured profile
+- textual profile
+- user query
+- clarification question-answer sequence
+
+Consultant final generation, retrieval, EvaluatorAgent scoring, and routing are rerun. This measures end-to-end operational stability under fixed inputs rather than deterministic reproducibility under a frozen evidence set.
+
+The default full experiment uses 100 profiles with 5 replays per profile and selection seed `42`.
+
+---
+
+## Scope and interpretation
+
+This repository supports a computational research testbed for retirement-oriented financial guidance in the context of displaced Ukrainians in Poland.
+
+The framework does **not** constitute a validated autonomous financial advisor.
+
+The current evaluation does not establish:
+
+- human-expert agreement with EvaluatorAgent scores
+- real-world user benefit
+- regulatory compliance
+- fairness across protected groups
+- privacy guarantees
+- cybersecurity robustness
+- longitudinal reliability
+- generalization to other countries or displaced populations
+
+The term **trustworthiness** is therefore used operationally and is limited to the dimensions explicitly measured in the testbed.
+
+---
+
+## Synthetic profile calibration
+
+The principal empirical anchor is the **NBP survey conducted in 2025 and published in 2026**, based on **3,965 respondents**.
+
+The generator intentionally distinguishes empirical anchors from modelling assumptions.
+
+| Provenance category | Variables |
+|---|---|
+| Directly survey-derived | Gender, employment status, base remittance rate |
+| Survey-anchored with modelling assumptions | Monthly-income bands and within-band sampling |
+| Researcher-defined modelling assumptions | Number of dependents, duration of residence in Poland, savings-generation rules, expenditure shares and minimum floors, conditional Polish-language proficiency |
+
+The conditional Polish-language model is researcher-defined. It should not be interpreted as a direct reconstruction of the marginal language-proficiency distribution reported by NBP.
+
+Monthly-income band boundaries are survey-anchored. Within-band sampling weights are modelling choices.
+
+Generated profiles are synthetic scenarios informed by survey evidence. They are not population estimates.
+
+---
+
+## Budget simulation
+
+The budget generator computes income, housing, utilities, food, transport, healthcare, other expenditure, remittances, savings, and monthly surplus algorithmically.
+
+When generated expenditure exceeds the feasible level implied by the minimum-surplus rule, the algorithm first reduces miscellaneous spending toward its minimum floor. If this is insufficient, flexible components are proportionally scaled while core expenditure floors are preserved.
+
+This feasibility-preserving procedure improves internal consistency but can make some synthetic households more solvent than comparable real-world households. Deficit rates and surplus distributions produced by the generator should therefore be interpreted as properties of the computational testbed rather than population estimates.
 
 ---
 
@@ -119,18 +335,19 @@ Each case is routed to one of three outcomes and labelled in `case_status`:
 
 ### 1. Obtain API credentials
 
-| Key | Where to get it |
+| Key | Purpose |
 |---|---|
-| `OPENAI_API_KEY` | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
-| `DEEPSEEK_API_KEY` | [platform.deepseek.com](https://platform.deepseek.com) -> API Keys |
-| `TAVILY_API_KEY` | [app.tavily.com](https://app.tavily.com) (optional; only needed if `CONSULTANT_ENABLE_TAVILY=true`) |
+| `OPENAI_API_KEY` | RefugeeAgent and ConsultantAgent |
+| `DEEPSEEK_API_KEY` | EvaluatorAgent |
+| `TAVILY_API_KEY` | Optional open-web retrieval when Tavily is enabled |
 
-### 2. Clone and configure environment
+### 2. Configure the environment
 
 ```bash
 cp .env.example .env
-# Fill in OPENAI_API_KEY and DEEPSEEK_API_KEY (and optionally TAVILY_API_KEY)
 ```
+
+Add the required API keys to `.env`.
 
 ### 3. Install dependencies
 
@@ -141,33 +358,36 @@ poetry install
 
 ### 4. Add source documents
 
-Place files in:
-- `books_refuge/` - NBP reports, surveys, `.xlsx` tables about Ukrainian refugees in Poland
-- `books_consultant/` - Polish pension law, ZUS guides, MISSOC documents
+Place source files in:
 
-Supported formats: `.pdf`, `.html`, `.xlsx`
+```text
+books_refuge/
+books_consultant/
+```
 
-### 5. Run locally
+Supported local formats include PDF, HTML, and XLSX.
+
+### 5. Run the main pipeline
 
 ```bash
-# Default: 5 cases
 poetry run python run_langgraph.py
+```
 
-# Custom batch size
+To set a custom batch size:
+
+```bash
 N_CASES=50 poetry run python run_langgraph.py
 ```
 
-Results are saved to `runs/runs.jsonl`.
+Main pipeline results are written to:
+
+```text
+runs/runs.jsonl
+```
 
 ---
 
 ## Docker
-
-### Prerequisites
-
-```bash
-cp .env.example .env   # fill in API keys
-```
 
 ### Build
 
@@ -175,26 +395,31 @@ cp .env.example .env   # fill in API keys
 docker compose build
 ```
 
-### Run pipeline
+### Run
 
 ```bash
-# Generate 5 cases (default)
 docker compose run --rm pipeline
+```
 
-# Custom batch size
+Custom batch size:
+
+```bash
 N_CASES=50 docker compose run --rm pipeline
+```
 
-# Large batch in background
+Large batch in the background:
+
+```bash
 N_CASES=500 docker compose run -d pipeline
 ```
 
-### View logs of a running container
+View logs:
 
 ```bash
 docker compose logs -f pipeline
 ```
 
-### Stop
+Stop containers:
 
 ```bash
 docker compose down
@@ -202,70 +427,78 @@ docker compose down
 
 ---
 
-## Environment Variables
+## Environment variables
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `OPENAI_API_KEY` | yes | | Used by RefugeeAgent and ConsultantAgent |
 | `DEEPSEEK_API_KEY` | yes | | Used by EvaluatorAgent |
 | `DEEPSEEK_BASE_URL` | no | `https://api.deepseek.com/v1` | DeepSeek endpoint |
-| `N_CASES` | no | `5` | Cases to generate per run |
-| `CONSULTANT_ENABLE_WEB` | no | `true` | Live web retrieval on/off |
-| `CONSULTANT_ALLOWED_DOMAINS` | no | `gov.pl,zus.pl,...` | Comma-separated domain allowlist |
-| `CONSULTANT_WEB_TIMEOUT_MS` | no | `20000` | Web fetch timeout (ms) |
-| `CONSULTANT_WEB_MAX_SOURCES` | no | `4` | Max live web sources per query |
-| `CONSULTANT_WEB_CACHE_DIR` | no | `books_consultant/live_web_cache` | Cache directory for fetched pages |
-| `CONSULTANT_CURATED_URLS` | no | | Extra URLs always included (comma-separated) |
-| `CONSULTANT_ENABLE_TAVILY` | no | `false` | Tavily search on/off |
-| `TAVILY_API_KEY` | no | | Required if Tavily is enabled |
+| `N_CASES` | no | `5` | Cases generated per main run |
+| `CONSULTANT_ENABLE_WEB` | no | `true` | Curated live-web retrieval |
+| `CONSULTANT_ALLOWED_DOMAINS` | no | configured allow-list | Trusted institutional domains |
+| `CONSULTANT_WEB_TIMEOUT_MS` | no | `20000` | Web-fetch timeout in milliseconds |
+| `CONSULTANT_WEB_MAX_SOURCES` | no | `4` | Maximum curated live-web sources per retrieval call |
+| `CONSULTANT_WEB_CACHE_DIR` | no | `books_consultant/live_web_cache` | Directory used for fetched page artefacts |
+| `CONSULTANT_CURATED_URLS` | no | | Additional curated URLs |
+| `CONSULTANT_ENABLE_TAVILY` | no | `false` | Optional Tavily retrieval |
+| `TAVILY_API_KEY` | no | | Required only when Tavily is enabled |
 
 ---
 
-## Profile Variables (NBP 2025)
+## Main output format
 
-| Variable | Distribution | Source |
-|---|---|---|
-| `gender` | female 66%, male 34% | NBP 2025 |
-| `employment_status` | permanent_job 54%, other_work 17%, unemployed 14%, economically_inactive 11%, self_employed 4% | NBP 2025 |
-| `polish_language_level` | none 5%, basic 39%, intermediate 42%, advanced 14% | NBP 2025 Fig. 11 |
-| `income` | PLN 800-8,500 by gender x employment band | NBP 2025 Fig. 22 |
-| `months_in_poland` | 6-48 months | |
-| `remittances_flag` | 36% send remittances | NBP 2025 |
+Each line in `runs/runs.jsonl` represents one advisory cycle.
 
----
+```text
+run_id
+ts_unix
+case_status
 
-## Analysis
-
-`eda_runs.ipynb` contains the full exploratory analysis of the generated dataset. It produces all figures and tables reported in the paper: profile distributions (gender, employment, language, dependents), budget distributions, evaluator score statistics, issue frequency, score breakdown by employment status and budget position, and Pearson correlations between profile variables and rubric scores.
-
----
-
-## Output Format
-
-Each line of `runs/runs.jsonl` is a JSON object:
-
-```
-run_id                  UUID
-ts_unix                 UNIX timestamp
-case_status             accepted | needs_review | flagged
 refugee
-  anchors               gender, employment_status, income_min/max, months, dependents, ...
-  profile_json          income, savings, housing, food, transport, ... (PLN)
-  persona_json          age, education, financial_literacy, retirement_goals, ...
-  profile_text          human-readable text sent to the consultant
-  user_query            generated retirement question
+  anchors
+  profile_json
+  persona_json
+  profile_text
+  user_query
+
 consultant_draft
-  draft_answer          first-pass answer
-  clarifying_questions  up to 3 questions
-refugee_clarifying_qa   list of {question, answer}
+  draft_answer
+  clarifying_questions
+
+refugee_clarifying_qa
+
 consultant_final
-  final_answer          numbered-section text
-  final_answer_struct   structured JSON (summary, quick_budget_check, next_steps, ...)
-  final_sources         sources actually cited in the answer
-  repair_issues         list of sections filled deterministically when LLM output was incomplete
+  final_answer
+  final_answer_struct
+  final_sources
+  repair_issues
+
 evaluator
-  deterministic_checks  citation_count, arithmetic mismatches, private_programs_flag, ...
-  llm_rubric            scores per dimension + issues list
-  flagged_spans         age claims and private program mentions
-  final                 overall_score (0-10), allow_to_show, grounded_only_pass
+  deterministic_checks
+  llm_rubric
+  flagged_spans
+  final
 ```
+
+The `final` evaluator block contains the operational score and routing gates used to derive `case_status`.
+
+---
+
+## Reproducibility
+
+For the primary dataset, analysis scripts use the first 500 chronological records from `runs/runs.jsonl`.
+
+Additional experiment outputs are stored separately under `experiments/outputs/` and do not overwrite the primary dataset.
+
+The analysis and test scripts are designed to keep the original `runs/runs.jsonl` file read-only.
+
+---
+
+## Data and code availability
+
+The generated advisory dataset is available on Hugging Face:
+
+[Uliana333/ukrainian-refugees-financial-advisory](https://huggingface.co/datasets/Uliana333/ukrainian-refugees-financial-advisory)
+
+The repository contains the source code, retrieval configuration, analysis scripts, ablation experiment, repeated-run experiment, and reproducibility checks used in the study.

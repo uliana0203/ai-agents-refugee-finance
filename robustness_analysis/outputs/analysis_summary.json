@@ -1,0 +1,392 @@
+{
+  "_meta": {
+    "n_original_cases": 500,
+    "slice_rule": "first 500 records of runs/runs.jsonl sorted by ts_unix (record 501 excluded)",
+    "scipy_available": true,
+    "routing_counts": {
+      "accepted": 327,
+      "needs_review": 170,
+      "flagged": 3
+    }
+  },
+  "issue_severity": {
+    "n_cases": 500,
+    "n_cases_with_at_least_one_issue": 489,
+    "n_issues_total": 627,
+    "issue_level_severity_totals": {
+      "low": 602,
+      "medium": 25,
+      "high": 0
+    },
+    "case_max_severity_distribution": {
+      "low": 465,
+      "medium": 24,
+      "none": 11
+    },
+    "note": "No high-severity issue occurs in the 500-case dataset; the high-severity routing path in Table 3 is defined but was never triggered."
+  },
+  "penalty_audit": {
+    "recomputed_matches_stored": 500,
+    "mismatches": 0,
+    "penalised_issue_counts": {
+      "missing_citation/low": 151,
+      "missing_required_section/medium": 10,
+      "unsupported_claim/medium": 12
+    },
+    "total_points_by_type": {
+      "missing_citation/low": 151,
+      "missing_required_section/medium": 20,
+      "unsupported_claim/medium": 12
+    },
+    "cases_with_zero_penalty": 333,
+    "note": "Only missing_citation, missing_required_section and unsupported_claim/medium ever reduce the score in the 500-case dataset. unsupported_claim/low, unsafe_overconfidence and 'other' issues carry no score penalty."
+  },
+  "threshold_sensitivity": {
+    "actual": {
+      "accepted": 327,
+      "needs_review": 170,
+      "flagged": 3
+    },
+    "scenarios": [
+      {
+        "scenario": "accept>=8, flag<7 (looser accept)",
+        "accept_threshold": 8,
+        "flag_below": 7,
+        "accepted": 483,
+        "needs_review": 14,
+        "flagged": 3,
+        "accepted_pct": 96.6
+      },
+      {
+        "scenario": "accept>=9, flag<7 (ACTUAL)",
+        "accept_threshold": 9,
+        "flag_below": 7,
+        "accepted": 327,
+        "needs_review": 170,
+        "flagged": 3,
+        "accepted_pct": 65.4
+      },
+      {
+        "scenario": "accept>=10, flag<7 (stricter accept)",
+        "accept_threshold": 10,
+        "flag_below": 7,
+        "accepted": 12,
+        "needs_review": 485,
+        "flagged": 3,
+        "accepted_pct": 2.4
+      },
+      {
+        "scenario": "accept>=9, flag<6 (looser flag)",
+        "accept_threshold": 9,
+        "flag_below": 6,
+        "accepted": 327,
+        "needs_review": 173,
+        "flagged": 0,
+        "accepted_pct": 65.4
+      },
+      {
+        "scenario": "accept>=9, flag<8 (stricter flag)",
+        "accept_threshold": 9,
+        "flag_below": 8,
+        "accepted": 327,
+        "needs_review": 156,
+        "flagged": 17,
+        "accepted_pct": 65.4
+      }
+    ],
+    "note": "Post-hoc recomputation only; the reported experiment is unchanged. Acceptance requires composite score >= threshold AND grounded_only_pass AND allow_to_show."
+  },
+  "rag_config": {
+    "embedding_model": "text-embedding-3-small",
+    "semantic_chunking": true,
+    "semantic_breakpoint_threshold_type": "percentile",
+    "semantic_breakpoint_threshold_amount": 95.0,
+    "chunk_size (post-semantic size guard)": 1500,
+    "chunk_overlap (ACTUAL, not the RagConfig default 200)": 100,
+    "size_guard_splitter": "RecursiveCharacterTextSplitter(separators=['\\n\\n','\\n',' ',''])",
+    "vector_store": "FAISS (local, faiss-cpu)",
+    "similarity_function": "FAISS default L2 / Euclidean distance on embedding vectors (cosine NOT explicitly set)",
+    "retrieval_top_k_consultant": 5,
+    "retrieval_top_k_refugee_context": 4,
+    "reranking": "NOT IMPLEMENTED",
+    "retrieval_score_threshold": "NOT IMPLEMENTED (similarity_search returns top-k unconditionally, no score cutoff)",
+    "duplicate_source_handling": "NOT IMPLEMENTED as explicit dedup; IDs namespaced S1.. / S100.. (web) / S200.. (Tavily); final_sources filtered to tags actually cited (_extract_used_source_ids)",
+    "conflicting_source_handling": "NOT IMPLEMENTED as reconciliation; prompt instructs model to prefer retrieved evidence for Poland-specific claims and to avoid unsupported pension vehicles",
+    "live_web_retrieval": "ENABLED by default (CONSULTANT_ENABLE_WEB=true); MCP fetch of curated official URLs, ranked by _score_url, capped at web_max_sources=4; re-fetched every call (cache written, not read)",
+    "allowed_domains": "gov.pl,zus.pl,podatki.gov.pl,biznes.gov.pl,euraxess.pl,ec.europa.eu",
+    "open_web_search_tavily": "DISABLED by default (CONSULTANT_ENABLE_TAVILY=false); when on, restricted to allowed_domains",
+    "live_vs_open_web_criterion": "Curated institutional URLs are topic-routed (_detect_topics -> _topic_url_map); open-web (Tavily) is opt-in and domain-restricted; used only 5x across the 500-case dataset",
+    "source_id_namespaces": "S1-S99 vectorstore, S100+ live web, S200+ Tavily"
+  },
+  "rag_index_manifests": [
+    {
+      "index": "refuge",
+      "n_docs": 567,
+      "n_chunks": 2016,
+      "built_at_unix": 1778671114,
+      "build_seconds": 307.165,
+      "n_pdf": 6,
+      "n_html": 0,
+      "n_xlsx": 1
+    },
+    {
+      "index": "consultant",
+      "n_docs": 1514,
+      "n_chunks": 4230,
+      "built_at_unix": 1778671839,
+      "build_seconds": 724.066,
+      "n_pdf": 10,
+      "n_html": 5,
+      "n_xlsx": 0
+    }
+  ],
+  "rag_observed_source_mix_500": {
+    "vectorstore (local FAISS)": 1271,
+    "live_web (MCP fetch)": 1651,
+    "tavily_search": 5
+  },
+  "subgroups": {
+    "scipy_available": true,
+    "framing": "exploratory; synthetic profiles generated by interdependent simulation rules; no causal claims",
+    "employment_levels": [
+      "permanent_job",
+      "self_employed",
+      "other_work",
+      "unemployed",
+      "economically_inactive"
+    ],
+    "deficit_n": 75,
+    "has_dependents_n": 340
+  },
+  "budget_generation": {
+    "deficit_cases": 75,
+    "deficit_pct": 15.0,
+    "surplus_mean": 217.4,
+    "surplus_median": 240.0,
+    "surplus_min": -1410.0,
+    "surplus_max": 1480.0,
+    "surplus_percentiles": {
+      "p1": -810.1,
+      "p5": -451.0,
+      "p10": -171.0,
+      "p25": 110.0,
+      "p50": 240.0,
+      "p75": 360.0,
+      "p90": 541.0,
+      "p95": 660.0,
+      "p99": 970.2
+    },
+    "feasibility_note": "The generator preserves core floors (housing/food/other/min utilities/min transport) and trims discretionary 'other' then scales flexible items to hit a small minimum surplus target; this can make synthetic households more solvent than some real refugee households. Numbers are not population estimates."
+  },
+  "calibration_provenance": {
+    "survey_derived": [
+      "gender",
+      "employment_status",
+      "remittances(base rate)"
+    ],
+    "survey_anchored_plus_assumptions": [
+      "monthly income"
+    ],
+    "modelling_assumptions": [
+      "dependents",
+      "months_in_poland",
+      "savings",
+      "expense shares",
+      "polish_language_level (conditional model)"
+    ],
+    "discrepancies": [
+      "polish_language_level: code uses a months/employment-conditional model, not the marginal NBP Fig.11 proportions implied by README/manuscript.",
+      "monthly income: only band edges/medians are survey-anchored; sub-band weights are researcher-set.",
+      "NBP wording: manuscript 'NBP 2025 survey' vs report describing 2024; README adds 'April-June 2025' fieldwork window absent from the manuscript."
+    ],
+    "consistent": [
+      "n=3,965 sample size across code/README/manuscript",
+      "employment 54/4/17/14/11%",
+      "gender 66/34%",
+      "months 6-48 uniform"
+    ]
+  },
+  "arithmetic_safeguard": {
+    "n_cases": 500,
+    "arithmetic_mismatch_cases": 0,
+    "arithmetic_mismatch_pct": 0.0,
+    "section_repair_cases": 10,
+    "interpretation": "The near-perfect arithmetic_consistency score (mean 9.99) primarily reflects the deterministic recomputation/overwrite of the budget block, not unaided LLM numerical reasoning. This should be stated in Results, not only Discussion."
+  },
+  "sample_interaction": {
+    "run_id": "bb439067-fbc4-4a6c-ac8f-240f267fb605",
+    "case_status": "accepted",
+    "PROFILE (text)": "Monthly income: PLN 2390\nCurrent savings: PLN 310\nMonthly expenses:\n- Housing: PLN 1120\n- Utilities: PLN 50\n- Food: PLN 800\n- Transportation: PLN 30\n- Healthcare: PLN 0\n- Other: PLN 280\n- Remittances: PLN 0\nHas 2 dependent(s)\nEmployment status: permanent_job\nGender: female\nLives in Poland for 14 month(s)\nPolish language level: advanced",
+    "PERSONA (json)": "{\"age\": 28, \"education\": \"vocational\", \"occupation\": \"administrative assistant\", \"city_tier\": \"small\", \"housing_situation\": \"rented apartment\", \"financial_literacy\": \"medium\", \"risk_tolerance\": \"medium\", \"retirement_horizon\": \"early 60s\", \"retirement_priority\": \"medium\", \"retirement_goals\": [\"cover essentials\", \"healthcare buffer\", \"independent living\"], \"has_dedicated_retirement_plan\": false, \"knows_if_enrolled_private_plan\": \"not_sure\", \"polish_language_level\": \"advanced\", \"notes\": \"Struggles with underemployment despite advanced language skills.\"}",
+    "CLIENT QUESTION": "Given my financial profile, how much should I save monthly for retirement in Poland and what retirement-related options should I consider?",
+    "CONSULTANT DRAFT": "Given your current monthly income of PLN 2,390 and expenses totaling PLN 2,280, your savings capacity is limited (PLN 310 saved so far). In Poland, the minimum old-age pension is PLN 1,780.96 gross per month (S1), which may be insufficient to cover your current expenses, especially with two dependents. Since you have a permanent job, you are contributing to the mandatory old-age pension insurance via ZUS (S2, S3). To improve your retirement security, a conservative approach would be to save at least 10-15% of your net income monthly if possible (general rule of thumb, not Poland-specific). Additionally, as a parent of two children, you may be eligible for the Rodzina 800+ benefit, which provides PLN 800 per child monthly, potentially adding PLN 1,600 to your household income and easing your current budget constraints. This extra support could allow you to allocate some funds toward retirement savings. It is also advisable to regularly check your pension forecast via the ZUS online calculator to monitor your expected pension and adjust your savings accordingly (S100, S101).",
+    "CLARIFYING QUESTIONS": "Are you currently receiving or planning to apply for the Rodzina 800+ benefit for your two children? | Do you have any additional sources of income or assets besides your current savings and salary? | Are you open to setting aside a specific monthly amount for retirement savings, and if so, what is the maximum you could comfortably save?",
+    "REFUGEE ANSWERS": "Q: Are you currently receiving or planning to apply for the Rodzina 800+ benefit for your two children? A: I'm not sure, but I would likely consider applying for the Rodzina 800+ benefit to support my children. || Q: Do you have any additional sources of income or assets besides your current savings and salary? A: I'm not sure, but I might have some informal support or assistance from family or friends. || Q: Are you open to setting aside a specific monthly amount for retirement savings, and if so, what is the maximum you could comfortably save? A: I don't have a dedicated retirement plan yet - my savings are mostly general (PLN 310). I rely on standard work-related pension contributions, and I want to build a separate habit for retirement savings.",
+    "FINAL RECOMMENDATION": "1) Summary: Given your monthly income of PLN 2390 and expenses of PLN 2280, you have a small surplus of PLN 110 to allocate towards retirement savings. In Poland, the statutory retirement age is 60 for women, and the old-age pension amount depends on contributions paid to ZUS and other factors [S1][S102]. Since you have two dependents, you may be eligible for the Rodzina 800+ benefit, which provides PLN 800 per child monthly, potentially increasing your income by PLN 1600 to support your family. It is important to continue paying mandatory social security contributions through your employment, as these build your future pension rights [S2][S103].\n\n2) Quick budget check: Your monthly income is PLN 2390.0, and your total monthly expenses are PLN 2280.0, leaving you with a surplus of PLN 110.0.\n\n3) Suggested monthly retirement saving amount: PLN 100-150 per month, considering your current surplus and family needs. If your budget tightens, prioritize stabilizing your finances first (general rule of thumb, not Poland-specific).\n\n4) Retirement-related options in Poland: Ensure continuous mandatory old-age pension contributions through your permanent job, as these are the basis for your future pension from ZUS [S2][S103].; Apply for the Rodzina 800+ benefit for your two children to increase your household income by up to PLN 1600 per month, which can help free up funds for retirement savings [S3].; Use the ZUS online retirement calculator to monitor your projected pension and adjust your savings plan accordingly [S100][S101].; Consider voluntary additional pension contributions if your budget allows, to increase your retirement income beyond the state pension [S2].\n\n5) Next steps: 1. Confirm your eligibility and apply for the Rodzina 800+ benefit for your children to increase your monthly income [S3]. 2. Register and use the ZUS retirement calculator online to check your current pension projection and understand how your contributions affect your future pension [S100][S101]. 3. Maintain your mandatory social security contributions through your employment to secure your pension rights [S2][S103]. 4. Start setting aside PLN 100-150 monthly for retirement savings, adjusting as your financial situation improves (general rule of thumb, not Poland-specific). [S100]\n\n6) Sources used: [S1], [S2], [S3], [S100], [S101], [S102], [S103]",
+    "SOURCES USED": "[S1] books_consultant\\missoc-ssg-PL-2025-en.pdf (p.34, vectorstore); [S2] E:\\Personal finance project\\AI_agents\\books_consultant\\Social security _ EURAXESS.html (p.None, vectorstore); [S3] books_consultant\\missoc-ssg-PL-2025-en.pdf (p.7, vectorstore); [S100] https://www.zus.pl/swiadczenia/emerytury/kalkulatory-emerytalne/emerytura-na-nowych-zasadach/kalkulator-emerytalny-prognozowana-emerytura (p.None, live_web); [S101] https://www.zus.pl/swiadczenia/emerytury/kalkulatory-emerytalne/emerytura-na-nowych-zasadach/kalkulator-emerytalny-prognozowana-emerytura/obliczenia-w-kalkulatorze-emerytalnym (p.None, live_web); [S102] https://www.gov.pl/web/your-europe/old-age-pension--step-by-step (p.None, live_web); [S103] https://www.euraxess.pl/poland/social-security (p.None, live_web)",
+    "EVALUATOR SCORES": "{\"groundedness\": 8, \"groundedness_evidence\": \"the answer cites [S1], [S2], [S3], [S100], [S101], [S102], [S103] for claims about ZUS contributions, retirement age, and the Rodzina 800+ benefit\", \"arithmetic_consistency\": 10, \"arithmetic_consistency_evidence\": \"Your monthly income is PLN 2390.0, and your total monthly expenses are PLN 2280.0, leaving you with a surplus of PLN 110.0.\", \"actionability\": 9, \"actionability_evidence\": \"1. Confirm your eligibility and apply for the Rodzina 800+ benefit for your children to increase your monthly income [S3]. 2. Register and use the ZUS retirement calculator online... 3. Maintain your mandatory social security contributions... 4. Start setting aside PLN 100-150 monthly for retirement savings\", \"clarity\": 9, \"clarity_evidence\": \"the answer is structured with numbered sections, uses plain language, and explains terms like 'mandatory social security contributions' in context\", \"safety_ethics\": 8, \"safety_ethics_evidence\": \"the answer uses caveats like 'you may be eligible' and 'general rule of thumb, not Poland-specific' and does not promise specific pension amounts\"}",
+    "EVALUATOR ISSUES": "[{\"type\": \"unsupported_claim\", \"severity\": \"low\", \"message\": \"The answer suggests saving PLN 100-150 per month, but the surplus is only PLN 110, and the answer does not explain how to cover the extra PLN 40 if saving PLN 150.\", \"suggested_fix\": \"Either adjust the range to PLN 100-110 or explain that the higher end assumes the Rodzina 800+ benefit is received.\"}]",
+    "SCORING AUDIT (if present)": "\"not in original record\"",
+    "FINAL VERDICT": "{\"overall_score\": 9, \"allow_to_show\": true, \"grounded_only_pass\": true}"
+  },
+  "baseline_no_rag_analysis": {
+    "n_pairs": 50,
+    "direction": "WITH_RAG minus WITHOUT_RAG",
+    "scipy_available": true,
+    "retrieved_sources_count_without_rag": 0,
+    "overall_score": {
+      "metric": "overall_score",
+      "n_pairs": 50,
+      "mean_with": 8.4,
+      "median_with": 8.0,
+      "mean_without": 7.08,
+      "median_without": 7.0,
+      "mean_diff": 1.32,
+      "median_diff": 1.0,
+      "ci95_low": 1.054,
+      "ci95_high": 1.586,
+      "paired_t": 9.9777,
+      "p_ttest": 2.17e-13,
+      "wilcoxon_W": 20.0,
+      "p_wilcoxon": 2.04e-08,
+      "cohen_dz": 1.4111,
+      "note": ""
+    },
+    "groundedness": {
+      "metric": "score_groundedness",
+      "n_pairs": 50,
+      "mean_with": 8.0,
+      "median_with": 8.0,
+      "mean_without": 7.8,
+      "median_without": 8.0,
+      "mean_diff": 0.2,
+      "median_diff": 0.0,
+      "ci95_low": -0.159,
+      "ci95_high": 0.559,
+      "paired_t": 1.1209,
+      "p_ttest": 0.268,
+      "wilcoxon_W": 112.0,
+      "p_wilcoxon": 0.396,
+      "cohen_dz": 0.1585,
+      "note": ""
+    },
+    "arithmetic_consistency": {
+      "metric": "score_arithmetic_consistency",
+      "n_pairs": 50,
+      "mean_with": 10.0,
+      "median_with": 10.0,
+      "mean_without": 10.0,
+      "median_without": 10.0,
+      "mean_diff": 0.0,
+      "median_diff": 0.0,
+      "ci95_low": 0.0,
+      "ci95_high": 0.0,
+      "paired_t": NaN,
+      "p_ttest": NaN,
+      "wilcoxon_W": NaN,
+      "p_wilcoxon": NaN,
+      "cohen_dz": NaN,
+      "note": "all paired differences identical"
+    },
+    "actionability": {
+      "metric": "score_actionability",
+      "n_pairs": 50,
+      "mean_with": 8.08,
+      "median_with": 8.0,
+      "mean_without": 8.12,
+      "median_without": 8.0,
+      "mean_diff": -0.04,
+      "median_diff": 0.0,
+      "ci95_low": -0.154,
+      "ci95_high": 0.074,
+      "paired_t": -0.7035,
+      "p_ttest": 0.485,
+      "wilcoxon_W": 13.5,
+      "p_wilcoxon": 0.48,
+      "cohen_dz": -0.0995,
+      "note": ""
+    },
+    "clarity": {
+      "metric": "score_clarity",
+      "n_pairs": 50,
+      "mean_with": 9.0,
+      "median_with": 9.0,
+      "mean_without": 9.1,
+      "median_without": 9.0,
+      "mean_diff": -0.1,
+      "median_diff": 0.0,
+      "ci95_low": -0.204,
+      "ci95_high": 0.004,
+      "paired_t": -1.9415,
+      "p_ttest": 0.058,
+      "wilcoxon_W": 4.0,
+      "p_wilcoxon": 0.0588,
+      "cohen_dz": -0.2746,
+      "note": ""
+    },
+    "safety_ethics": {
+      "metric": "score_safety_ethics",
+      "n_pairs": 50,
+      "mean_with": 8.44,
+      "median_with": 8.0,
+      "mean_without": 8.9,
+      "median_without": 9.0,
+      "mean_diff": -0.46,
+      "median_diff": -1.0,
+      "ci95_low": -0.698,
+      "ci95_high": -0.222,
+      "paired_t": -3.8809,
+      "p_ttest": 0.000311,
+      "wilcoxon_W": 105.0,
+      "p_wilcoxon": 0.000612,
+      "cohen_dz": -0.5488,
+      "note": ""
+    },
+    "routing": {
+      "with_rag": {
+        "condition": "with_rag",
+        "accepted": 21,
+        "needs_review": 29,
+        "flagged": 0
+      },
+      "without_rag": {
+        "condition": "without_rag",
+        "accepted": 0,
+        "needs_review": 39,
+        "flagged": 11
+      },
+      "better_with_rag": 29,
+      "unchanged": 21,
+      "worse_with_rag": 0
+    },
+    "issue_cases_diff_without_minus_with": {
+      "missing_citation": 25,
+      "unsupported_claim": -31,
+      "unsupported_claim_high": 0,
+      "unsafe_overconfidence": 0,
+      "missing_required_section": 0,
+      "untrusted_source": 0,
+      "source_support_related": 1,
+      "any_issue": 0
+    },
+    "artifact_check_all_zero": true
+  },
+  "repeated_runs_analysis": {
+    "n_profiles": 100,
+    "total_runs": 500,
+    "error_stubs_excluded": 0,
+    "pct_profiles_identical_routing": 14.0,
+    "mean_pct_matching_modal": 73.2,
+    "fleiss_kappa_routing": 0.13084082811445427,
+    "mean_within_profile_sd_overall": 0.5537,
+    "mean_pairwise_jaccard_issue_types": 0.5278333333333333,
+    "icc21_by_dimension": {
+      "overall_score": 0.1422,
+      "score_groundedness": 0.1206,
+      "score_arithmetic_consistency": NaN,
+      "score_actionability": 0.2283,
+      "score_clarity": -0.0025,
+      "score_safety_ethics": 0.2694
+    }
+  }
+}

@@ -674,29 +674,57 @@ Return JSON:
             scores.get(k, 0)
             for k in ("groundedness", "arithmetic_consistency", "actionability", "clarity", "safety_ethics")
         ]
-        overall = int(round(sum(vals) / len(vals))) if vals else 0
+        base_score = int(round(sum(vals) / len(vals))) if vals else 0
+        overall = base_score
 
+        # scoring_audit: transparent, additive record of the deterministic penalty step.
+        # It reads the same intermediate values already used below and does NOT change
+        # overall_score, allow_to_show, grounded_only_pass, or routing.
+        applied_penalties: List[Dict[str, Any]] = []
         for it in issues:
             if not isinstance(it, dict):
                 continue
-            if it.get("type") == "math_error" and it.get("severity") == "high":
-                overall -= self.cfg.penalty_math_error
-            elif it.get("type") == "missing_citation":
-                overall -= self.cfg.penalty_missing_citations
-            elif it.get("type") == "missing_required_section":
-                overall -= self.cfg.penalty_missing_required_sections
-            elif it.get("type") == "untrusted_source":
-                overall -= self.cfg.penalty_untrusted_source
-            elif it.get("type") == "unsupported_claim" and it.get("severity") == "high":
+            it_type = it.get("type")
+            it_sev = it.get("severity")
+            if it_type == "math_error" and it_sev == "high":
+                penalty = self.cfg.penalty_math_error
+            elif it_type == "missing_citation":
+                penalty = self.cfg.penalty_missing_citations
+            elif it_type == "missing_required_section":
+                penalty = self.cfg.penalty_missing_required_sections
+            elif it_type == "untrusted_source":
+                penalty = self.cfg.penalty_untrusted_source
+            elif it_type == "unsupported_claim" and it_sev == "high":
                 if det["private_programs_flag"]:
-                    overall -= self.cfg.penalty_private_program_hallucination
+                    penalty = self.cfg.penalty_private_program_hallucination
                 else:
-                    overall -= self.cfg.penalty_unsupported_claim_high
-            elif it.get("type") == "unsupported_claim" and it.get("severity") == "medium":
-                overall -= self.cfg.penalty_unsupported_claim_medium
+                    penalty = self.cfg.penalty_unsupported_claim_high
+            elif it_type == "unsupported_claim" and it_sev == "medium":
+                penalty = self.cfg.penalty_unsupported_claim_medium
+            else:
+                continue
+            overall -= penalty
+            applied_penalties.append({
+                "type": it_type,
+                "severity": it_sev,
+                "penalty": -int(penalty),
+                "message": str(it.get("message", ""))[:200],
+            })
 
+        final_score_before_clipping = overall
         overall = max(0, min(10, overall))
         llm_eval["overall_score"] = overall
+        llm_eval["scoring_audit"] = {
+            "rubric_scores": {
+                k: scores.get(k, 0)
+                for k in ("groundedness", "arithmetic_consistency", "actionability", "clarity", "safety_ethics")
+            },
+            "base_score": base_score,
+            "penalties": applied_penalties,
+            "total_penalty": int(sum(p["penalty"] for p in applied_penalties)),
+            "final_score_before_clipping": int(final_score_before_clipping),
+            "final_score": int(overall),
+        }
 
         grounded_only_pass = True
         for it in issues:
