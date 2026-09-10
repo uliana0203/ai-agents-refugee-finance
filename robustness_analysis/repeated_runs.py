@@ -1,5 +1,5 @@
 """
-experiments/repeated_runs.py
+robustness_analysis/repeated_runs.py
 ==============================
 
 Two additional experiments that DO call the LLM APIs. Both re-use the FIXED inputs
@@ -24,12 +24,12 @@ RefugeeAgent is never run. runs/runs.jsonl is never written.
 Usage
 -----
     # small smoke tests (safe to run now)
-    python experiments/repeated_runs.py repeated --test
-    python experiments/repeated_runs.py baseline --test
+    python robustness_analysis/repeated_runs.py repeated --test
+    python robustness_analysis/repeated_runs.py baseline --test
 
     # full experiments (only after explicit go-ahead)
-    python experiments/repeated_runs.py repeated --n-profiles 100 --n-repeats 5 --seed 42
-    python experiments/repeated_runs.py baseline --n-pairs 50 --seed 42
+    python robustness_analysis/repeated_runs.py repeated --n-profiles 100 --n-repeats 5 --seed 42
+    python robustness_analysis/repeated_runs.py baseline --n-pairs 50 --seed 42
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ from pydantic import BaseModel, Field
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
-sys.path.insert(0, str(REPO_ROOT / "experiments"))
+sys.path.insert(0, str(REPO_ROOT / "robustness_analysis"))
 
 from dotenv import load_dotenv  # noqa: E402
 
@@ -60,7 +60,7 @@ load_dotenv(REPO_ROOT / ".env")
 
 import analysis as ra  # noqa: E402  (chronological loader + routing recompute)
 
-OUT_DIR = REPO_ROOT / "experiments" / "outputs"
+OUT_DIR = REPO_ROOT / "robustness_analysis" / "outputs"
 ACCEPT_THRESHOLD = 9   # from run_langgraph.py
 FLAG_BELOW = 7         # from run_langgraph.py
 
@@ -315,6 +315,32 @@ def _git_sha() -> str:
         return "unavailable"
 
 
+_SENSITIVE_CONFIG_FIELDS = {
+    "tavily_api_key",
+    "openai_api_key",
+    "deepseek_api_key",
+    "api_key",
+    "access_token",
+    "refresh_token",
+    "secret",
+    "client_secret",
+    "password",
+}
+
+
+def _sanitize_config(obj: Any) -> Any:
+    """Remove credential-bearing fields before serializing experiment metadata."""
+    if isinstance(obj, dict):
+        return {
+            k: _sanitize_config(v)
+            for k, v in obj.items()
+            if str(k).lower() not in _SENSITIVE_CONFIG_FIELDS
+        }
+    if isinstance(obj, list):
+        return [_sanitize_config(v) for v in obj]
+    return obj
+
+
 def _experiment_metadata(experiment: str, version: str, seed: int, rag_cfg) -> Dict[str, Any]:
     from agents.consultant import ConsultantAgentConfig
     from agents.evaluator import EvaluatorConfig
@@ -375,9 +401,9 @@ def _experiment_metadata(experiment: str, version: str, seed: int, rag_cfg) -> D
             "grounded_only_pass": "False if any high-severity unsupported_claim/math_error or medium+ "
                                   "missing_citation/missing_required_section/untrusted_source",
         },
-        "consultant_config_full": _d(cc),
-        "evaluator_config_full": _d(ec),
-        "rag_config_full": _d(rag_cfg),
+        "consultant_config_full": _sanitize_config(_d(cc)),
+        "evaluator_config_full": _sanitize_config(_d(ec)),
+        "rag_config_full": _sanitize_config(_d(rag_cfg)),
     }
 
 
@@ -601,7 +627,7 @@ def run_baseline(n_pairs: int, seed: int, out_path: Path, input_path: Path) -> N
 # ----------------------------------------------------------------------------
 
 def main(argv: List[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Revision 2026 API experiments (repeated runs / no-RAG baseline)")
+    p = argparse.ArgumentParser(description="Robustness and ablation experiments (repeated runs / no-RAG baseline)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     pr = sub.add_parser("repeated", help="TASK A: repeated-run reproducibility experiment")
