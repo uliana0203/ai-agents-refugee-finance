@@ -261,7 +261,7 @@ In the condition without RAG:
 - citation requirements that cannot be satisfied without retrieval are removed from the output contract
 - the recommendation is generated using the model and supplied client profile only
 
-This experiment is designed to isolate the role of retrieval in the implemented pipeline. It does not provide a single-agent or no-evaluator comparison.
+This experiment compares the implemented with RAG and without RAG conditions. Because disabling retrieval also required accompanying changes to the Consultant prompt and citation contract, the comparison should not be interpreted as a pure retrieval-only causal intervention. It does not provide a single-agent or no-evaluator comparison.
 
 ### Repeated-run stability
 
@@ -309,9 +309,9 @@ The generator intentionally distinguishes empirical anchors from modelling assum
 
 | Provenance category | Variables |
 |---|---|
-| Directly survey-derived | Gender, employment status, base remittance rate |
-| Survey-anchored with modelling assumptions | Monthly-income bands and within-band sampling |
-| Researcher-defined modelling assumptions | Number of dependents, duration of residence in Poland, savings-generation rules, expenditure shares and minimum floors, conditional Polish-language proficiency |
+| Directly survey-derived | Employment status, base remittance rate |
+| Survey-anchored with modelling assumptions | Gender, monthly-income bands and within-band sampling, Polish-language categories with researcher-defined conditional adjustments |
+| Researcher-defined modelling assumptions | Number of dependents, duration of residence in Poland, savings-generation rules, expenditure shares and minimum floors, conditional remittance adjustments by employment status and household-support proxy |
 
 The conditional Polish-language model is researcher-defined. It should not be interpreted as a direct reconstruction of the marginal language-proficiency distribution reported by NBP.
 
